@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulatore Dosimetro</title>
+  <style>
+    :root {
+      --bg: #0b0d0c;
+      --panel: #151a17;
+      --screen: #09110c;
+      --green: #9cff57;
+      --green-dim: #477c2b;
+      --amber: #ffc857;
+      --red: #ff5b5b;
+      --text: #dfe9df;
+      --muted: #7d897e;
+      --border: #2a342c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 50% 15%, #1a201c 0, #0b0d0c 55%),
+        var(--bg);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .device {
+      width: min(760px, 100%);
+      border: 1px solid #313b33;
+      border-radius: 24px;
+      padding: 22px;
+      background: linear-gradient(145deg, #1c211e, #101310);
+      box-shadow:
+        0 25px 70px rgba(0,0,0,.55),
+        inset 0 1px 0 rgba(255,255,255,.04);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+      gap: 16px;
+    }
+
+    .brand {
+      letter-spacing: .12em;
+      font-size: .82rem;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .8rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .led {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #5b625c;
+      box-shadow: 0 0 0 transparent;
+    }
+
+    .led.on {
+      background: var(--green);
+      box-shadow: 0 0 12px rgba(156,255,87,.6);
+    }
+
+    .display {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid #263229;
+      border-radius: 16px;
+      padding: 24px;
+      background: var(--screen);
+      box-shadow:
+        inset 0 0 24px rgba(0,0,0,.75),
+        0 8px 20px rgba(0,0,0,.25);
+    }
+
+    .display::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        repeating-linear-gradient(
+          0deg,
+          rgba(255,255,255,.012) 0,
+          rgba(255,255,255,.012) 1px,
+          transparent 1px,
+          transparent 4px
+        );
+      mix-blend-mode: screen;
+    }
+
+    .display-label {
+      font-size: .72rem;
+      color: var(--green-dim);
+      text-transform: uppercase;
+      letter-spacing: .14em;
+      margin-bottom: 8px;
+    }
+
+    .value-row {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    #dose {
+      font-family: "Courier New", monospace;
+      font-size: clamp(3.6rem, 10vw, 7rem);
+      line-height: .95;
+      letter-spacing: .04em;
+      color: var(--green);
+      text-shadow: 0 0 18px rgba(156,255,87,.2);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .unit {
+      font-family: "Courier New", monospace;
+      font-size: clamp(1rem, 2.8vw, 1.35rem);
+      color: #7fc957;
+    }
+
+    #levelText {
+      margin-top: 12px;
+      font-size: .9rem;
+      color: var(--muted);
+      min-height: 1.3em;
+    }
+
+    .meter {
+      margin-top: 20px;
+      height: 10px;
+      border-radius: 99px;
+      background: #182019;
+      overflow: hidden;
+      border: 1px solid #263229;
+    }
+
+    #meterFill {
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      background: var(--green);
+      box-shadow: 0 0 14px currentColor;
+      transition: width .18s ease, background-color .18s ease;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .stat {
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(255,255,255,.018);
+    }
+
+    .stat span {
+      display: block;
+      font-size: .68rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      margin-bottom: 7px;
+    }
+
+    .stat strong {
+      font-family: "Courier New", monospace;
+      font-size: 1.25rem;
+      color: #dceadc;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid #354137;
+      border-radius: 12px;
+      padding: 13px 16px;
+      color: var(--text);
+      background: #1a211c;
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+      transition: transform .08s ease, background .15s ease, border-color .15s ease;
+    }
+
+    button:hover {
+      background: #222b24;
+      border-color: #465448;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button.primary {
+      background: #28411f;
+      border-color: #51743f;
+      color: #d8ffca;
+    }
+
+    .settings {
+      margin-top: 18px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,.016);
+    }
+
+    .settings h2 {
+      margin: 0 0 14px;
+      font-size: .82rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      font-weight: 700;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      margin: 12px 0;
+    }
+
+    .row label {
+      font-size: .88rem;
+      color: #b9c4bb;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--green);
+      cursor: pointer;
+    }
+
+    .range-wrap {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 84px;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .number {
+      min-width: 84px;
+      text-align: right;
+      font-family: "Courier New", monospace;
+      color: var(--green);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hint {
+      margin-top: 12px;
+      font-size: .74rem;
+      line-height: 1.45;
+      color: #69756c;
+    }
+
+    .footer {
+      margin-top: 14px;
+      text-align: center;
+      font-size: .72rem;
+      color: #59635b;
+    }
+
+    @media (max-width: 620px) {
+      .stats { grid-template-columns: 1fr; }
+      .controls { grid-template-columns: 1fr; }
+      .device { padding: 16px; }
+      .display { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="device" aria-label="Simulatore di dosimetro">
+    <div class="topbar">
+      <div class="brand">Radiation Monitor // SIM</div>
+      <div class="status">
+        <span id="led" class="led"></span>
+        <span id="statusText">Fermo</span>
+      </div>
+    </div>
+
+    <section class="display">
+      <div class="display-label">Dose rate</div>
+      <div class="value-row">
+        <span id="dose">0.120</span>
+        <span class="unit">µSv/h</span>
+      </div>
+      <div id="levelText">Fondo simulato</div>
+      <div id="equivalent" style="margin-top:6px;font-family:'Courier New',monospace;font-size:.78rem;color:#647065;"></div>
+      <div class="meter" aria-hidden="true">
+        <div id="meterFill"></div>
+      </div>
+    </section>
+
+    <section class="stats">
+      <div class="stat">
+        <span>Conteggi/min</span>
+        <strong id="cpm">1</strong>
+      </div>
+      <div class="stat">
+        <span>Conteggi totali</span>
+        <strong id="total">0</strong>
+      </div>
+      <div class="stat">
+        <span>Suono</span>
+        <strong id="audioState">OFF</strong>
+      </div>
+    </section>
+
+    <div class="controls">
+      <button id="startBtn" class="primary">▶ Avvia simulazione</button>
+      <button id="resetBtn">↺ Azzera conteggi</button>
+    </div>
+
+    <section class="settings">
+      <h2>Controlli simulazione</h2>
+
+      <div class="row">
+        <label for="radiation">Intensità di base</label>
+        <div class="number"><span id="radiationValue">0.120</span> µSv/h</div>
+      </div>
+      <div class="range-wrap">
+        <input id="radiation" type="range" min="0" max="1000" value="324.3" step="0.1" aria-label="Intensità di base" />
+      </div>
+
+      <div class="row">
+        <label for="noise">Fluttuazione casuale</label>
+        <div class="number"><span id="noiseValue">18</span>%</div>
+      </div>
+      <div class="range-wrap">
+        <input id="noise" type="range" min="0" max="60" value="18" step="1" />
+      </div>
+
+      <div class="row">
+        <label for="sound">Volume click</label>
+        <div class="number"><span id="soundValue">65</span>%</div>
+      </div>
+      <div class="range-wrap">
+        <input id="sound" type="range" min="0" max="100" value="65" step="1" />
+      </div>
+
+      <div class="hint">
+        La simulazione è puramente visiva/sonora e non rappresenta una misura reale.
+        I click vengono sintetizzati direttamente nel browser tramite Web Audio API.
+      </div>
+    </section>
+
+    <div class="footer">Premi “Avvia” per abilitare l'audio del browser.</div>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const doseEl = document.getElementById("dose");
+      const cpmEl = document.getElementById("cpm");
+      const totalEl = document.getElementById("total");
+      const audioStateEl = document.getElementById("audioState");
+      const levelTextEl = document.getElementById("levelText");
+      const equivalentEl = document.getElementById("equivalent");
+      const meterFillEl = document.getElementById("meterFill");
+      const ledEl = document.getElementById("led");
+      const statusTextEl = document.getElementById("statusText");
+
+      const startBtn = document.getElementById("startBtn");
+      const resetBtn = document.getElementById("resetBtn");
+
+      const radiationEl = document.getElementById("radiation");
+      const radiationValueEl = document.getElementById("radiationValue");
+      const noiseEl = document.getElementById("noise");
+      const noiseValueEl = document.getElementById("noiseValue");
+      const soundEl = document.getElementById("sound");
+      const soundValueEl = document.getElementById("soundValue");
+
+      let running = false;
+      let totalCounts = 0;
+      let lastDose = 0.12;
+      let displayedCpm = 1;
+      let secondTimer = null;
+      let renderTimer = null;
+      let audioCtx = null;
+      let audioGain = null;
+      let lastClickAt = 0;
+      let clickTimer = null;
+      let noiseBuffer = null;
+
+      // Scala volutamente "da simulazione": 100 µSv/h è il fondo scala del display.
+      const MAX_DISPLAY = 1_000_000; // 1 Sv/h in µSv/h
+
+      function sliderToDose(sliderValue) {
+        // Scala logaritmica: 0 = 0.001 µSv/h, 1000 = 1,000,000 µSv/h (1 Sv/h).
+        // Il cursore mantiene quindi buona sensibilità sia ai bassi che agli alti livelli.
+        const min = 0.001;
+        const max = 1_000_000;
+        const t = Number(sliderValue) / 1000;
+        return min * Math.pow(max / min, t);
+      }
+
+      function formatDose(value) {
+        if (value < 10) return value.toFixed(3);
+        if (value < 100) return value.toFixed(2);
+        if (value < 1000) return value.toFixed(1);
+        if (value < 1_000_000) return Math.round(value).toLocaleString('it-IT');
+        return '1.000.000';
+      }
+
+      function baseDose() {
+        return sliderToDose(radiationEl.value);
+      }
+
+      function updateSettingsUI() {
+        radiationValueEl.textContent = formatDose(baseDose());
+        noiseValueEl.textContent = noiseEl.value;
+        soundValueEl.textContent = soundEl.value;
+      }
+
+      function levelFor(dose) {
+        if (dose < 0.5) return { text: "Fondo simulato", color: "#9cff57" };
+        if (dose < 2) return { text: "Leggermente elevata", color: "#c8ef62" };
+        if (dose < 10) return { text: "Elevata", color: "#ffc857" };
+        if (dose < 100) return { text: "Molto elevata", color: "#ff9f43" };
+        if (dose < 1_000) return { text: "Severa", color: "#ff7a59" };
+        if (dose < 100_000) return { text: "Estremamente elevata", color: "#ff5b5b" };
+        return { text: "Livello estremo // SIMULAZIONE", color: "#ff3b3b" };
+      }
+
+      function randomizeDose() {
+        const base = baseDose();
+        const noise = Number(noiseEl.value) / 100;
+
+        // Rumore gaussiano semplice (Box-Muller) per una variazione più naturale.
+        const u1 = Math.max(Math.random(), 1e-9);
+        const u2 = Math.random();
+        const gaussian = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+
+        const variation = base * noise * 0.20 * gaussian;
+        const drift = Math.sin(Date.now() / 18000) * base * 0.03;
+
+        return Math.max(0, base + variation + drift);
+      }
+
+      function doseToCpm(dose) {
+        // Modello puramente scenografico: il rate cresce con la dose,
+        // fino a migliaia di conteggi/min. Il generatore audio lo limita
+        // per mantenere click distinguibili anche a livelli estremi.
+        return Math.max(0, Math.round(1 + Math.pow(dose, 0.55) * 10));
+      }
+
+      function updateDisplay() {
+        const level = levelFor(lastDose);
+
+        doseEl.textContent = lastDose.toFixed(3);
+        doseEl.style.color = level.color;
+        levelTextEl.textContent = level.text;
+        levelTextEl.style.color = level.color;
+
+        equivalentEl.textContent = lastDose >= 1000
+          ? `= ${(lastDose / 1_000_000).toFixed(6)} Sv/h`
+          : `= ${(lastDose / 1000).toFixed(6)} mSv/h`;
+
+        const meter = Math.min(100, (Math.log10(Math.max(lastDose, 0.001)) - Math.log10(0.001)) / (Math.log10(MAX_DISPLAY) - Math.log10(0.001)) * 100);
+        meterFillEl.style.width = meter + "%";
+        meterFillEl.style.backgroundColor = level.color;
+        meterFillEl.style.color = level.color;
+      }
+
+      function ensureAudio() {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) {
+            audioStateEl.textContent = "NON SUPPORTATO";
+            return false;
+          }
+
+          audioCtx = new AudioContextClass();
+          audioGain = audioCtx.createGain();
+          audioGain.gain.value = 0;
+          audioGain.connect(audioCtx.destination);
+        }
+
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume();
+        }
+
+        audioGain.gain.value = Number(soundEl.value) / 100;
+        audioStateEl.textContent = "ON";
+        return true;
+      }
+
+      function buildNoiseBuffer() {
+        if (!audioCtx || noiseBuffer) return;
+        const length = Math.floor(audioCtx.sampleRate * 0.06);
+        noiseBuffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
+        const data = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < length; i++) {
+          // Rumore breve con decadimento: dà il corpo secco del "click".
+          const t = i / length;
+          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 3.2);
+        }
+      }
+
+      function geigerClick(intensity = 1) {
+        if (!audioCtx || !audioGain || Number(soundEl.value) <= 0) return;
+
+        const now = audioCtx.currentTime;
+        if ((now * 1000) - lastClickAt < 5) return;
+        lastClickAt = now * 1000;
+
+        buildNoiseBuffer();
+
+        // 1) Impulso di rumore filtrato: la parte più caratteristica del click.
+        const noise = audioCtx.createBufferSource();
+        const noiseFilter = audioCtx.createBiquadFilter();
+        const noiseGain = audioCtx.createGain();
+        noise.buffer = noiseBuffer;
+        noiseFilter.type = "bandpass";
+        noiseFilter.frequency.value = 4200 + Math.random() * 1300;
+        noiseFilter.Q.value = 1.25;
+        const peak = Math.min(0.24, 0.075 + Math.min(10, intensity) * 0.008);
+        noiseGain.gain.setValueAtTime(0.0001, now);
+        noiseGain.gain.exponentialRampToValueAtTime(peak, now + 0.0007);
+        noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.035);
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(audioGain);
+        noise.start(now);
+
+        // 2) Piccolo impulso tonale per dare un "tic" più netto.
+        const osc = audioCtx.createOscillator();
+        const oscGain = audioCtx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(1700 + Math.random() * 500, now);
+        osc.frequency.exponentialRampToValueAtTime(950 + Math.random() * 150, now + 0.018);
+        const tonePeak = Math.min(0.10, 0.025 + Math.min(10, intensity) * 0.006);
+        oscGain.gain.setValueAtTime(0.0001, now);
+        oscGain.gain.exponentialRampToValueAtTime(tonePeak, now + 0.0005);
+        oscGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.022);
+        osc.connect(oscGain);
+        oscGain.connect(audioGain);
+        osc.start(now);
+        osc.stop(now + 0.025);
+
+        // Un breve flash sul LED rende visibile ogni evento di conteggio.
+        ledEl.style.transform = "scale(1.55)";
+        setTimeout(() => { ledEl.style.transform = "scale(1)"; }, 45);
+      }
+
+      function randomExponentialDelay(ratePerSecond) {
+        if (ratePerSecond <= 0) return 1000;
+        const u = Math.max(1e-7, Math.random());
+        return Math.max(8, -Math.log(1 - u) / ratePerSecond * 1000);
+      }
+
+      function scheduleNextClick() {
+        if (!running) return;
+
+        const cpm = Math.max(0, doseToCpm(lastDose));
+        const cappedRate = Math.min(24, cpm / 60);
+        clickTimer = setTimeout(() => {
+          if (!running) return;
+
+          if (cpm > 0) {
+            geigerClick(Math.min(10, cpm / 12));
+            totalCounts += 1;
+            totalEl.textContent = String(totalCounts);
+          }
+          scheduleNextClick();
+        }, randomExponentialDelay(cappedRate));
+      }
+
+      function scheduleClicks() {
+        const cpm = Math.max(0, doseToCpm(lastDose));
+        displayedCpm = cpm;
+        cpmEl.textContent = String(cpm);
+
+        if (!running) return;
+        if (clickTimer) clearTimeout(clickTimer);
+        scheduleNextClick();
+      }
+
+      function start() {
+        if (running) return;
+
+        ensureAudio();
+        running = true;
+        ledEl.classList.add("on");
+        statusTextEl.textContent = "In esecuzione";
+        startBtn.textContent = "■ Ferma simulazione";
+
+        lastDose = randomizeDose();
+        updateDisplay();
+        scheduleClicks();
+
+        secondTimer = setInterval(() => {
+          lastDose = randomizeDose();
+          updateDisplay();
+          scheduleClicks();
+        }, 1000);
+
+        renderTimer = setInterval(() => {
+          audioGain && (audioGain.gain.value = Number(soundEl.value) / 100);
+        }, 200);
+      }
+
+      function stop() {
+        running = false;
+        if (clickTimer) {
+          clearTimeout(clickTimer);
+          clickTimer = null;
+        }
+        ledEl.classList.remove("on");
+        statusTextEl.textContent = "Fermo";
+        startBtn.textContent = "▶ Avvia simulazione";
+
+        if (secondTimer) {
+          clearInterval(secondTimer);
+          secondTimer = null;
+        }
+
+        if (renderTimer) {
+          clearInterval(renderTimer);
+          renderTimer = null;
+        }
+      }
+
+      startBtn.addEventListener("click", () => {
+        if (running) stop();
+        else start();
+      });
+
+      resetBtn.addEventListener("click", () => {
+        totalCounts = 0;
+        totalEl.textContent = "0";
+      });
+
+      [radiationEl, noiseEl, soundEl].forEach(el => {
+        el.addEventListener("input", () => {
+          updateSettingsUI();
+
+          if (el === soundEl && audioGain) {
+            audioGain.gain.value = Number(soundEl.value) / 100;
+          }
+
+          // Aggiorna immediatamente il display anche durante la regolazione.
+          if (!running) {
+            lastDose = baseDose();
+            displayedCpm = doseToCpm(lastDose);
+            cpmEl.textContent = String(displayedCpm);
+            updateDisplay();
+          }
+        });
+      });
+
+      // Posiziona inizialmente il cursore sul valore di circa 0.12 µSv/h.
+      radiationEl.value = (Math.log(0.12 / 0.001) / Math.log(1_000_000 / 0.001) * 1000).toFixed(1);
+      updateSettingsUI();
+      lastDose = baseDose();
+      displayedCpm = doseToCpm(lastDose);
+      cpmEl.textContent = String(displayedCpm);
+      updateDisplay();
+    })();
+  </script>
+</body>
+</html>
