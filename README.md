@@ -9,4 +9,4 @@ This very simple web page simulates a radiation monitor, with ionizing radiation
 - Volume: defines the sound volume of the clicks
 
 
-Try it here on [CodeSandbox](jnpsk6.csb.app/)
+Try it here on [CodeSandbox](https://jnpsk6.csb.app/)
